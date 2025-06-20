@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +29,6 @@ export const useUSBDetection = () => {
   const checkServerConnection = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:5000/api/usb-status', {
-        timeout: 3000,
         headers: { 'Cache-Control': 'no-cache' }
       });
       const wasConnected = serverConnected;
