@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Shield, Wifi, WifiOff, Activity, Settings, Lock, Unlock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -6,6 +5,7 @@ import USBDetectionPanel from '@/components/USBDetectionPanel';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import OTPEntryForm from '@/components/OTPEntryForm';
 import SecurityStatus from '@/components/SecurityStatus';
+import Footer from '@/components/Footer';
 import { useUSBDetection } from '@/hooks/useUSBDetection';
 
 const Index = () => {
@@ -233,6 +233,8 @@ const Index = () => {
           serverConnected={serverConnected}
         />
       </div>
+
+      <Footer />
     </div>
   );
 };
