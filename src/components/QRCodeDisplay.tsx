@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { QrCode, RefreshCw, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { QrCode, RefreshCw, CheckCircle, XCircle, Shield } from 'lucide-react';
 
 interface QRCodeDisplayProps {
   qrCodeUrl: string;
@@ -44,12 +44,19 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
               <div className="bg-white p-4 rounded-xl shadow-lg">
                 <img 
                   src={qrCodeUrl} 
-                  alt="QR Code" 
+                  alt="QR Code with embedded OTP" 
                   className="w-48 h-48 mx-auto"
                 />
               </div>
               <div className="absolute -top-2 -right-2 bg-green-500 text-white p-2 rounded-full">
                 <CheckCircle className="w-4 h-4" />
+              </div>
+              {/* Security indicator for embedded OTP */}
+              <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-center justify-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-400 text-sm font-medium">Secure OTP Embedded</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -62,22 +69,6 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           )}
         </div>
 
-        {/* OTP Display */}
-        {currentOTP && (
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-blue-400" />
-              <span className="text-blue-400 font-medium">Current OTP</span>
-            </div>
-            <div className="text-2xl font-mono font-bold text-white tracking-wider">
-              {currentOTP}
-            </div>
-            <p className="text-sm text-blue-300 mt-2">
-              Valid for 5 minutes
-            </p>
-          </div>
-        )}
-
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
@@ -87,12 +78,12 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           {isGenerating ? (
             <>
               <RefreshCw className="w-5 h-5 animate-spin" />
-              Generating...
+              Generating Secure QR...
             </>
           ) : (
             <>
               <QrCode className="w-5 h-5" />
-              Generate QR Code
+              Generate Secure QR Code
             </>
           )}
         </button>
@@ -106,14 +97,15 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           </div>
         )}
 
-        {/* Instructions */}
+        {/* Enhanced Instructions */}
         <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
           <h4 className="text-sm font-semibold text-white mb-2">How to use:</h4>
           <ol className="text-xs text-slate-300 space-y-1 text-left">
-            <li>1. Click "Generate QR Code" to create a new OTP</li>
-            <li>2. Scan the QR code with your mobile device</li>
-            <li>3. Enter the 6-digit OTP in the verification form</li>
-            <li>4. USB access will be granted upon successful verification</li>
+            <li>1. Click "Generate Secure QR Code" to create authentication code</li>
+            <li>2. Scan QR code with your mobile device to reveal OTP</li>
+            <li>3. Enter the extracted OTP in the verification form</li>
+            <li>4. USB access will be granted and auto-mounting enabled</li>
+            <li>5. Device mounting is blocked until successful authentication</li>
           </ol>
         </div>
       </div>

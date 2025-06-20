@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Shield, Wifi, WifiOff, Activity, Settings, Lock, Unlock } from 'lucide-react';
+import { Shield, Wifi, WifiOff, Activity, Settings, Lock, Unlock, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import USBDetectionPanel from '@/components/USBDetectionPanel';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
@@ -14,6 +15,7 @@ const Index = () => {
   const [qrCodeUrl, setQRCodeUrl] = useState<string>('');
   const [isUSBBlocked, setIsUSBBlocked] = useState<boolean>(true);
   const [serverConnected, setServerConnected] = useState<boolean>(false);
+  const [autoMountBlocked, setAutoMountBlocked] = useState<boolean>(true);
   
   const { 
     usbDevices, 
@@ -23,98 +25,157 @@ const Index = () => {
     usbEvents 
   } = useUSBDetection();
 
-  // Check server connection
+  // Enhanced server connection check
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/usb-status');
-        setServerConnected(response.ok);
+        const response = await fetch('http://localhost:5000/api/usb-status', {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const wasConnected = serverConnected;
+        const isConnected = response.ok;
+        
+        setServerConnected(isConnected);
+        
+        if (isConnected && response.ok) {
+          const data = await response.json();
+          setIsUSBBlocked(data.usb_blocked || true);
+          setAutoMountBlocked(data.auto_mount_blocked || true);
+        }
+        
+        if (!wasConnected && isConnected) {
+          // Enable USB blocking immediately when server comes online
+          enableSystemProtection();
+        }
       } catch (error) {
+        console.error('Connection check failed:', error);
         setServerConnected(false);
       }
     };
 
     checkConnection();
-    const interval = setInterval(checkConnection, 5000);
+    const interval = setInterval(checkConnection, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [serverConnected]);
 
+  // Enable comprehensive USB protection
+  const enableSystemProtection = async () => {
+    try {
+      await fetch('http://localhost:5000/api/enable-protection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          blockAutoMount: true,
+          requireAuthentication: true 
+        })
+      });
+    } catch (error) {
+      console.error('Failed to enable system protection:', error);
+    }
+  };
+
+  // Generate secure QR code with embedded OTP (no display)
   const generateOTP = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/generate-otp', {
+      const response = await fetch('http://localhost:5000/api/generate-secure-qr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          embedOTP: true,
+          hideOTPDisplay: true 
+        })
       });
       
       if (response.ok) {
         const data = await response.json();
+        // Store OTP internally but don't display it
         setCurrentOTP(data.otp);
         setQRCodeUrl(data.qr_code_url);
+        
         toast({
-          title: "QR Code Generated",
-          description: "New OTP generated successfully. Scan QR code or enter OTP manually.",
+          title: "🔐 Secure QR Generated",
+          description: "Scan QR code to reveal authentication token. USB mounting blocked until verified.",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to generate OTP. Please check server connection.",
+        description: "Failed to generate secure QR code.",
         variant: "destructive"
       });
     }
   };
 
+  // Enhanced OTP verification with mount control
   const verifyOTP = async (otp: string) => {
     try {
-      const response = await fetch('http://localhost:5000/api/verify-otp', {
+      const response = await fetch('http://localhost:5000/api/verify-otp-and-mount', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp })
+        body: JSON.stringify({ 
+          otp,
+          enableAutoMount: true,
+          deviceAccess: true 
+        })
       });
       
       const data = await response.json();
       
       if (data.success) {
         setIsUSBBlocked(false);
+        setAutoMountBlocked(false);
+        
         toast({
-          title: "Access Granted",
-          description: "USB access has been unlocked successfully!",
+          title: "✅ Access Granted",
+          description: "USB access unlocked! Auto-mounting enabled for connected devices.",
         });
+        
+        // Clear OTP after successful verification
+        setCurrentOTP('');
+        setQRCodeUrl('');
       } else {
         toast({
-          title: "Access Denied",
-          description: data.message || "Invalid OTP. Please try again.",
+          title: "❌ Access Denied",
+          description: data.message || "Invalid authentication token. USB remains blocked.",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to verify OTP. Please check server connection.",
+        description: "Authentication failed. Please try again.",
         variant: "destructive"
       });
     }
   };
 
+  // Enhanced USB blocking toggle
   const toggleUSBBlocking = async () => {
     try {
-      const endpoint = isUSBBlocked ? '/api/unblock-usb' : '/api/block-usb';
+      const endpoint = isUSBBlocked ? '/api/unblock-usb-system' : '/api/block-usb-system';
       const response = await fetch(`http://localhost:5000${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          blockAutoMount: !isUSBBlocked,
+          systemWide: true 
+        })
       });
       
       if (response.ok) {
-        setIsUSBBlocked(!isUSBBlocked);
+        const newBlockedState = !isUSBBlocked;
+        setIsUSBBlocked(newBlockedState);
+        setAutoMountBlocked(newBlockedState);
+        
         toast({
-          title: isUSBBlocked ? "USB Unblocked" : "USB Blocked",
-          description: `USB access has been ${isUSBBlocked ? 'enabled' : 'disabled'}.`,
+          title: newBlockedState ? "🔒 System Locked" : "🔓 System Unlocked",
+          description: `USB ${newBlockedState ? 'auto-mounting blocked' : 'auto-mounting enabled'} system-wide.`,
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to toggle USB blocking.",
+        description: "Failed to toggle system protection.",
         variant: "destructive"
       });
     }
@@ -141,21 +202,30 @@ const Index = () => {
             QRLock Pro
           </h1>
           <p className="text-xl text-slate-300 mb-6">
-            Advanced USB Security System
+            Advanced USB Security & Mount Protection
           </p>
           
-          {/* Server Status */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            {serverConnected ? (
-              <>
-                <Wifi className="w-5 h-5 text-green-400" />
-                <span className="text-green-400 font-medium">Server Connected</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-5 h-5 text-red-400" />
-                <span className="text-red-400 font-medium">Server Disconnected</span>
-              </>
+          {/* Enhanced Server Status */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <div className="flex items-center gap-2">
+              {serverConnected ? (
+                <>
+                  <Wifi className="w-5 h-5 text-green-400" />
+                  <span className="text-green-400 font-medium">Server Connected</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-5 h-5 text-red-400" />
+                  <span className="text-red-400 font-medium">Server Disconnected</span>
+                </>
+              )}
+            </div>
+            
+            {autoMountBlocked && (
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-400" />
+                <span className="text-orange-400 font-medium">Auto-Mount Blocked</span>
+              </div>
             )}
           </div>
         </div>
@@ -172,11 +242,11 @@ const Index = () => {
             />
           </div>
 
-          {/* QR Code Display Card */}
+          {/* Enhanced QR Code Display Card (no OTP shown) */}
           <div className="lg:col-span-1">
             <QRCodeDisplay 
               qrCodeUrl={qrCodeUrl}
-              currentOTP={currentOTP}
+              currentOTP={currentOTP} // Internal use only, not displayed
               onGenerateOTP={generateOTP}
               serverConnected={serverConnected}
             />
@@ -191,7 +261,7 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Control Buttons */}
+        {/* Enhanced Control Buttons */}
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           <button
             onClick={generateOTP}
@@ -199,7 +269,7 @@ const Index = () => {
             className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-blue-500/25 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Activity className="w-5 h-5" />
-            Generate New QR
+            Generate Secure QR
           </button>
 
           <button
@@ -212,7 +282,7 @@ const Index = () => {
             } disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-lg disabled:cursor-not-allowed flex items-center gap-2`}
           >
             {isUSBBlocked ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-            {isUSBBlocked ? 'Unlock USB' : 'Lock USB'}
+            {isUSBBlocked ? 'Enable USB System' : 'Lock USB System'}
           </button>
 
           <button
@@ -221,7 +291,7 @@ const Index = () => {
             className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-purple-500/25 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Settings className="w-5 h-5" />
-            {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
+            {isMonitoring ? 'Stop Protection' : 'Start Protection'}
           </button>
         </div>
 
