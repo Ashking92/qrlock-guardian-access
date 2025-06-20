@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Shield, Wifi, WifiOff, Activity, Settings, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { Shield, Wifi, WifiOff, Activity, Settings, Lock, Unlock, AlertTriangle, Download, History, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import USBDetectionPanel from '@/components/USBDetectionPanel';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
@@ -16,6 +15,8 @@ const Index = () => {
   const [isUSBBlocked, setIsUSBBlocked] = useState<boolean>(true);
   const [serverConnected, setServerConnected] = useState<boolean>(false);
   const [autoMountBlocked, setAutoMountBlocked] = useState<boolean>(true);
+  const [securityLevel, setSecurityLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const [adminMode, setAdminMode] = useState<boolean>(false);
   
   const { 
     usbDevices, 
@@ -74,33 +75,47 @@ const Index = () => {
     }
   };
 
-  // Generate secure QR code with embedded OTP (no display)
+  // Fixed QR code generation using existing OTP endpoint
   const generateOTP = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/generate-secure-qr', {
+      // First generate OTP using existing endpoint
+      const otpResponse = await fetch('http://localhost:5000/api/generate-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          embedOTP: true,
-          hideOTPDisplay: true 
+          security_level: securityLevel,
+          include_qr: true 
         })
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        // Store OTP internally but don't display it
-        setCurrentOTP(data.otp);
-        setQRCodeUrl(data.qr_code_url);
+      if (otpResponse.ok) {
+        const otpData = await otpResponse.json();
+        setCurrentOTP(otpData.otp);
+        
+        // Create QR code URL with the OTP embedded
+        const qrData = JSON.stringify({
+          otp: otpData.otp,
+          timestamp: new Date().toISOString(),
+          security_level: securityLevel,
+          device_id: 'web-client'
+        });
+        
+        // Generate QR code using a QR code API service
+        const qrCodeDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+        setQRCodeUrl(qrCodeDataUrl);
         
         toast({
           title: "🔐 Secure QR Generated",
-          description: "Scan QR code to reveal authentication token. USB mounting blocked until verified.",
+          description: "QR code generated with embedded authentication token. Scan to access USB system.",
         });
+      } else {
+        throw new Error('Failed to generate OTP');
       }
     } catch (error) {
+      console.error('QR generation error:', error);
       toast({
-        title: "Error",
-        description: "Failed to generate secure QR code.",
+        title: "QR Generation Failed",
+        description: "Unable to generate QR code. Please check server connection.",
         variant: "destructive"
       });
     }
@@ -181,6 +196,38 @@ const Index = () => {
     }
   };
 
+  // New feature: Security level management
+  const changeSecurityLevel = (level: 'low' | 'medium' | 'high') => {
+    setSecurityLevel(level);
+    toast({
+      title: "Security Level Updated",
+      description: `Security set to ${level.toUpperCase()} level`,
+    });
+  };
+
+  // New feature: Export security logs
+  const exportSecurityLogs = () => {
+    const logs = {
+      events: usbEvents,
+      devices: usbDevices,
+      timestamp: new Date().toISOString(),
+      security_level: securityLevel
+    };
+    
+    const dataStr = JSON.stringify(logs, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `usb-security-logs-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    toast({
+      title: "Logs Exported",
+      description: "Security logs downloaded successfully",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -190,7 +237,7 @@ const Index = () => {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Enhanced Header with Admin Toggle */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="relative">
@@ -204,6 +251,21 @@ const Index = () => {
           <p className="text-xl text-slate-300 mb-6">
             Advanced USB Security & Mount Protection
           </p>
+          
+          {/* Admin Mode Toggle */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <button
+              onClick={() => setAdminMode(!adminMode)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                adminMode 
+                  ? 'bg-orange-500/20 border border-orange-500/50 text-orange-400' 
+                  : 'bg-gray-700/20 border border-gray-600/50 text-gray-400'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              Admin Mode
+            </button>
+          </div>
           
           {/* Enhanced Server Status */}
           <div className="flex items-center justify-center gap-4 mb-8">
@@ -229,6 +291,28 @@ const Index = () => {
             )}
           </div>
         </div>
+
+        {/* Security Level Selector */}
+        {adminMode && (
+          <div className="mb-6 bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 p-4">
+            <h3 className="text-lg font-semibold text-white mb-3">Security Level</h3>
+            <div className="flex gap-2">
+              {(['low', 'medium', 'high'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => changeSecurityLevel(level)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    securityLevel === level
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
+                  }`}
+                >
+                  {level.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Main Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
@@ -261,7 +345,7 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Enhanced Control Buttons */}
+        {/* Enhanced Control Buttons with New Features */}
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           <button
             onClick={generateOTP}

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { QrCode, RefreshCw, CheckCircle, XCircle, Shield } from 'lucide-react';
+import { QrCode, RefreshCw, CheckCircle, XCircle, Shield, Copy, Eye, EyeOff } from 'lucide-react';
 
 interface QRCodeDisplayProps {
   qrCodeUrl: string;
@@ -16,11 +16,21 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   serverConnected
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     await onGenerateOTP();
     setTimeout(() => setIsGenerating(false), 1000);
+  };
+
+  const copyOTP = async () => {
+    if (currentOTP) {
+      await navigator.clipboard.writeText(currentOTP);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -68,6 +78,35 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
             </div>
           )}
         </div>
+
+        {/* OTP Display (Optional) */}
+        {currentOTP && (
+          <div className="mb-4 p-3 bg-gray-800/50 border border-gray-600/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-300 text-sm">OTP Code:</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowOTP(!showOTP)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  {showOTP ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={copyOTP}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 font-mono text-lg text-white">
+              {showOTP ? currentOTP : '••••••'}
+            </div>
+            {copied && (
+              <p className="text-green-400 text-xs mt-1">Copied to clipboard!</p>
+            )}
+          </div>
+        )}
 
         {/* Generate Button */}
         <button
