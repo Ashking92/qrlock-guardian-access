@@ -5,6 +5,7 @@ import USBDetectionPanel from '@/components/USBDetectionPanel';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import OTPEntryForm from '@/components/OTPEntryForm';
 import SecurityStatus from '@/components/SecurityStatus';
+import AIAgent from '@/components/AIAgent';
 import Footer from '@/components/Footer';
 import { useUSBDetection } from '@/hooks/useUSBDetection';
 
@@ -314,8 +315,8 @@ const Index = () => {
           </div>
         )}
 
-        {/* Main Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+        {/* Main Dashboard Grid - Updated to include AI Agent */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           {/* Security Status Card */}
           <div className="lg:col-span-1">
             <SecurityStatus 
@@ -326,11 +327,11 @@ const Index = () => {
             />
           </div>
 
-          {/* Enhanced QR Code Display Card (no OTP shown) */}
+          {/* QR Code Display Card */}
           <div className="lg:col-span-1">
             <QRCodeDisplay 
               qrCodeUrl={qrCodeUrl}
-              currentOTP={currentOTP} // Internal use only, not displayed
+              currentOTP={currentOTP}
               onGenerateOTP={generateOTP}
               serverConnected={serverConnected}
             />
@@ -342,6 +343,11 @@ const Index = () => {
               onVerifyOTP={verifyOTP}
               serverConnected={serverConnected}
             />
+          </div>
+
+          {/* AI Agent Card */}
+          <div className="lg:col-span-1">
+            <AIAgent serverConnected={serverConnected} />
           </div>
         </div>
 
