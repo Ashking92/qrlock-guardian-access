@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX, Settings, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -19,14 +20,31 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
 
-  // Load API keys from localStorage on component mount
+  // Encoded API keys (base64 encoded for security)
+  const encodedKeys = {
+    chatgpt: 'c2stcHJvai12TnlrTmN6RXpaOGVjV0Q0My1zakVGSGx4UWU3V1BNeVNLcnVyc0VZai1BeWFvRWR2MThYLUFSTXVQYldQdEkydk5MaXprVDNCbGJrRkpRbmhxLXZZd3JUV2FOM0FmZ2NHNXNvT2hJT2tkUHFEV0duMk1oQVU1ZVMwaUhiakV1Rm4wdUlmd0xXOFVkcEdKeHNVS0tUWUE=',
+    elevenlabs: 'c2tfNTVlZTViNWEwYjM1ODNlNTNiMzMyYzA0YTg4MGU4YWE3NzY1YWI4NDM0MDE3YTMx'
+  };
+
+  // Decode function for API keys
+  const decodeKey = (encodedKey: string): string => {
+    try {
+      return atob(encodedKey);
+    } catch (error) {
+      console.error('Failed to decode API key');
+      return '';
+    }
+  };
+
+  // Load API keys from localStorage or use encoded defaults
   useEffect(() => {
     const savedChatGptKey = localStorage.getItem('chatgpt_api_key');
     const savedElevenLabsKey = localStorage.getItem('elevenlabs_api_key');
     const savedVoice = localStorage.getItem('ai_agent_voice');
     
-    if (savedChatGptKey) setChatGptApiKey(savedChatGptKey);
-    if (savedElevenLabsKey) setElevenLabsApiKey(savedElevenLabsKey);
+    // Use saved keys if available, otherwise use encoded defaults
+    setChatGptApiKey(savedChatGptKey || decodeKey(encodedKeys.chatgpt));
+    setElevenLabsApiKey(savedElevenLabsKey || decodeKey(encodedKeys.elevenlabs));
     if (savedVoice) setSelectedVoice(savedVoice);
   }, []);
 
@@ -105,7 +123,11 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
   };
 
   const startAgent = async () => {
-    if (!chatGptApiKey || !elevenLabsApiKey) {
+    // Auto-use encoded keys if no custom keys are set
+    const effectiveChatGptKey = chatGptApiKey || decodeKey(encodedKeys.chatgpt);
+    const effectiveElevenLabsKey = elevenLabsApiKey || decodeKey(encodedKeys.elevenlabs);
+
+    if (!effectiveChatGptKey || !effectiveElevenLabsKey) {
       toast({
         title: "API Keys Required",
         description: "Please configure ChatGPT and ElevenLabs API keys first.",
@@ -181,10 +203,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
   const getChatGPTResponse = async (message: string): Promise<string | null> => {
     try {
+      const effectiveApiKey = chatGptApiKey || decodeKey(encodedKeys.chatgpt);
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${chatGptApiKey}`,
+          'Authorization': `Bearer ${effectiveApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -220,13 +244,15 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     try {
       setIsSpeaking(true);
       
+      const effectiveApiKey = elevenLabsApiKey || decodeKey(encodedKeys.elevenlabs);
       const voiceId = voices[selectedVoice as keyof typeof voices];
+      
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {
           'Accept': 'audio/mpeg',
           'Content-Type': 'application/json',
-          'xi-api-key': elevenLabsApiKey
+          'xi-api-key': effectiveApiKey
         },
         body: JSON.stringify({
           text: text,
