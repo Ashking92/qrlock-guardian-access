@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX, Settings, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -46,38 +45,41 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
   // Initialize speech recognition
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+    if (typeof window !== 'undefined') {
+      const SpeechRecognitionClass = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      if (SpeechRecognitionClass) {
+        recognitionRef.current = new SpeechRecognitionClass();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-        console.log('Speech recognized:', transcript);
-        
-        // Check for greeting words
-        if (transcript.includes('hello') || transcript.includes('hi') || transcript.includes('hey')) {
-          handleGreeting(transcript);
-        }
-      };
+        recognitionRef.current.onresult = (event) => {
+          const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+          console.log('Speech recognized:', transcript);
+          
+          // Check for greeting words
+          if (transcript.includes('hello') || transcript.includes('hi') || transcript.includes('hey')) {
+            handleGreeting(transcript);
+          }
+        };
 
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        if (isActive) {
-          // Restart listening if agent is still active
-          setTimeout(() => {
-            recognitionRef.current?.start();
-          }, 100);
-        } else {
+        recognitionRef.current.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
           setIsListening(false);
-        }
-      };
+        };
+
+        recognitionRef.current.onend = () => {
+          if (isActive) {
+            // Restart listening if agent is still active
+            setTimeout(() => {
+              recognitionRef.current?.start();
+            }, 100);
+          } else {
+            setIsListening(false);
+          }
+        };
+      }
     }
 
     synthRef.current = window.speechSynthesis;
