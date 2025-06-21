@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX, Settings, Key } from 'lucide-react';
+import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX, Settings, Key, TestTube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AIAgentProps {
@@ -16,6 +16,8 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
   const [chatGptApiKey, setChatGptApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('Aria');
+  const [demoMode, setDemoMode] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -36,16 +38,27 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     }
   };
 
+  // Function to mask API keys for display
+  const maskApiKey = (key: string): string => {
+    if (!key) return '';
+    if (key.length <= 8) return '*'.repeat(key.length);
+    return key.substring(0, 4) + '*'.repeat(key.length - 8) + key.substring(key.length - 4);
+  };
+
   // Load API keys from localStorage or use encoded defaults
   useEffect(() => {
     const savedChatGptKey = localStorage.getItem('chatgpt_api_key');
     const savedElevenLabsKey = localStorage.getItem('elevenlabs_api_key');
     const savedVoice = localStorage.getItem('ai_agent_voice');
+    const savedDemoMode = localStorage.getItem('demo_mode') === 'true';
+    const savedAdminEmail = localStorage.getItem('admin_email');
     
     // Use saved keys if available, otherwise use encoded defaults
     setChatGptApiKey(savedChatGptKey || decodeKey(encodedKeys.chatgpt));
     setElevenLabsApiKey(savedElevenLabsKey || decodeKey(encodedKeys.elevenlabs));
     if (savedVoice) setSelectedVoice(savedVoice);
+    setDemoMode(savedDemoMode);
+    if (savedAdminEmail) setAdminEmail(savedAdminEmail);
   }, []);
 
   // Voice IDs for ElevenLabs
@@ -113,10 +126,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     localStorage.setItem('chatgpt_api_key', chatGptApiKey);
     localStorage.setItem('elevenlabs_api_key', elevenLabsApiKey);
     localStorage.setItem('ai_agent_voice', selectedVoice);
+    localStorage.setItem('demo_mode', demoMode.toString());
+    localStorage.setItem('admin_email', adminEmail);
     
     toast({
       title: "Settings Saved",
-      description: "API keys and voice settings have been saved locally.",
+      description: "API keys, voice settings, and demo configuration have been saved locally.",
     });
     
     setShowSettings(false);
@@ -150,7 +165,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
       
       toast({
         title: "🤖 AI Agent Activated",
-        description: "Say 'hello', 'hi', or 'hey' to start a conversation!",
+        description: demoMode ? "Demo mode active - USB notifications will be sent to admin email!" : "Say 'hello', 'hi', or 'hey' to start a conversation!",
       });
     } catch (error) {
       toast({
@@ -305,9 +320,16 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
             )}
           </div>
+          {demoMode && (
+            <div className="ml-2">
+              <TestTube className="w-6 h-6 text-orange-400" />
+            </div>
+          )}
         </div>
         
-        <h3 className="text-xl font-bold text-white mb-6">AI Security Assistant</h3>
+        <h3 className="text-xl font-bold text-white mb-6">
+          AI Security Assistant {demoMode && <span className="text-orange-400">(Demo)</span>}
+        </h3>
 
         {/* Status Indicators */}
         <div className="flex justify-center gap-4 mb-6">
@@ -354,7 +376,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
           <div className="bg-gray-800/50 border border-gray-600/30 rounded-xl p-4 mb-4">
             <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Key className="w-5 h-5" />
-              API Configuration
+              Configuration
             </h4>
             
             <div className="space-y-4">
@@ -364,11 +386,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
                 </label>
                 <input
                   type="password"
-                  value={chatGptApiKey}
+                  value={maskApiKey(chatGptApiKey)}
                   onChange={(e) => setChatGptApiKey(e.target.value)}
-                  placeholder="sk-..."
+                  placeholder="Enter your ChatGPT API key"
                   className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-gray-400 mt-1">Your API key is masked for security</p>
               </div>
               
               <div>
@@ -377,11 +400,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
                 </label>
                 <input
                   type="password"
-                  value={elevenLabsApiKey}
+                  value={maskApiKey(elevenLabsApiKey)}
                   onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                  placeholder="Your ElevenLabs API key"
+                  placeholder="Enter your ElevenLabs API key"
                   className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-gray-400 mt-1">Your API key is masked for security</p>
               </div>
               
               <div>
@@ -397,6 +421,44 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
                     <option key={voice} value={voice}>{voice}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Demo Mode Section */}
+              <div className="border-t border-gray-600/30 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                    <TestTube className="w-4 h-4" />
+                    Demo Mode
+                  </label>
+                  <button
+                    onClick={() => setDemoMode(!demoMode)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      demoMode ? 'bg-orange-500' : 'bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      demoMode ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">
+                  Enable demo mode to simulate USB insertion notifications
+                </p>
+                
+                {demoMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Admin Email for Notifications
+                    </label>
+                    <input
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                )}
               </div>
               
               <button
@@ -414,10 +476,11 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
           <h4 className="text-sm font-semibold text-white mb-2">How to use:</h4>
           <ol className="text-xs text-slate-300 space-y-1 text-left">
             <li>1. Configure your ChatGPT and ElevenLabs API keys in settings</li>
-            <li>2. Click "Start AI Agent" to activate voice recognition</li>
-            <li>3. Say "hello", "hi", or "hey" to start a conversation</li>
-            <li>4. The AI will respond with both text and voice</li>
-            <li>5. Click "Stop AI Agent" to deactivate the assistant</li>
+            <li>2. Enable demo mode for USB insertion simulations (optional)</li>
+            <li>3. Click "Start AI Agent" to activate voice recognition</li>
+            <li>4. Say "hello", "hi", or "hey" to start a conversation</li>
+            <li>5. The AI will respond with both text and voice</li>
+            <li>6. Click "Stop AI Agent" to deactivate the assistant</li>
           </ol>
         </div>
 

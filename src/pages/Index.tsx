@@ -6,6 +6,7 @@ import QRCodeDisplay from '@/components/QRCodeDisplay';
 import OTPEntryForm from '@/components/OTPEntryForm';
 import SecurityStatus from '@/components/SecurityStatus';
 import AIAgent from '@/components/AIAgent';
+import DemoUSBNotification from '@/components/DemoUSBNotification';
 import Footer from '@/components/Footer';
 import { useUSBDetection } from '@/hooks/useUSBDetection';
 
@@ -18,6 +19,8 @@ const Index = () => {
   const [autoMountBlocked, setAutoMountBlocked] = useState<boolean>(true);
   const [securityLevel, setSecurityLevel] = useState<'low' | 'medium' | 'high'>('medium');
   const [adminMode, setAdminMode] = useState<boolean>(false);
+  const [demoMode, setDemoMode] = useState<boolean>(false);
+  const [adminEmail, setAdminEmail] = useState<string>('');
   
   const { 
     usbDevices, 
@@ -26,6 +29,14 @@ const Index = () => {
     stopMonitoring, 
     usbEvents 
   } = useUSBDetection();
+
+  // Load demo settings
+  useEffect(() => {
+    const savedDemoMode = localStorage.getItem('demo_mode') === 'true';
+    const savedAdminEmail = localStorage.getItem('admin_email') || '';
+    setDemoMode(savedDemoMode);
+    setAdminEmail(savedAdminEmail);
+  }, []);
 
   // Enhanced server connection check
   useEffect(() => {
@@ -315,8 +326,8 @@ const Index = () => {
           </div>
         )}
 
-        {/* Main Dashboard Grid - Updated to include AI Agent */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+        {/* Main Dashboard Grid - Updated to include Demo USB component */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
           {/* Security Status Card */}
           <div className="lg:col-span-1">
             <SecurityStatus 
@@ -348,6 +359,14 @@ const Index = () => {
           {/* AI Agent Card */}
           <div className="lg:col-span-1">
             <AIAgent serverConnected={serverConnected} />
+          </div>
+
+          {/* Demo USB Notification Card */}
+          <div className="lg:col-span-1">
+            <DemoUSBNotification 
+              demoMode={demoMode}
+              adminEmail={adminEmail}
+            />
           </div>
         </div>
 
