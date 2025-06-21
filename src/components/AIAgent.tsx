@@ -12,6 +12,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoStartAttempted, setAutoStartAttempted] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -47,6 +48,36 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
   const selectedVoice = 'Aria'; // Default voice
 
+  // Auto-start AI agent when server connects
+  useEffect(() => {
+    const attemptAutoStart = async () => {
+      if (serverConnected && !isActive && !autoStartAttempted) {
+        console.log('Server connected, attempting to auto-start AI agent');
+        setAutoStartAttempted(true);
+        
+        try {
+          // Small delay to ensure everything is ready
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await startAgent();
+        } catch (error) {
+          console.error('Auto-start failed:', error);
+          // Reset flag to allow manual start
+          setAutoStartAttempted(false);
+        }
+      }
+      
+      // Reset auto-start flag when server disconnects
+      if (!serverConnected) {
+        setAutoStartAttempted(false);
+        if (isActive) {
+          stopAgent();
+        }
+      }
+    };
+
+    attemptAutoStart();
+  }, [serverConnected, isActive, autoStartAttempted]);
+
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -70,14 +101,27 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
         recognitionRef.current.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
+          if (event.error === 'not-allowed') {
+            toast({
+              title: "Microphone Permission Required",
+              description: "Please allow microphone access to use the AI agent.",
+              variant: "destructive"
+            });
+          }
           setIsListening(false);
         };
 
         recognitionRef.current.onend = () => {
-          if (isActive) {
-            // Restart listening if agent is still active
+          if (isActive && serverConnected) {
+            // Restart listening if agent is still active and server is connected
             setTimeout(() => {
-              recognitionRef.current?.start();
+              if (recognitionRef.current && isActive) {
+                try {
+                  recognitionRef.current.start();
+                } catch (error) {
+                  console.error('Failed to restart recognition:', error);
+                }
+              }
             }, 100);
           } else {
             setIsListening(false);
@@ -93,7 +137,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
         recognitionRef.current.stop();
       }
     };
-  }, [isActive]);
+  }, [isActive, serverConnected]);
 
   const startAgent = async () => {
     const effectiveChatGptKey = decodeKey(encodedKeys.chatgpt);
@@ -103,6 +147,15 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
       toast({
         title: "API Keys Error",
         description: "API keys are not properly configured.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!serverConnected) {
+      toast({
+        title: "Server Not Connected",
+        description: "Please wait for server connection to start AI agent.",
         variant: "destructive"
       });
       return;
@@ -124,6 +177,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
         description: "Say 'hello', 'hi', or 'hey' to start a conversation!",
       });
     } catch (error) {
+      console.error('Failed to start agent:', error);
       toast({
         title: "Microphone Access Denied",
         description: "Please allow microphone access to use the AI agent.",
@@ -315,12 +369,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
         {/* Instructions */}
         <div className="bg-white/5 rounded-xl border border-white/10 p-4">
-          <h4 className="text-sm font-semibold text-white mb-2">How to use:</h4>
+          <h4 className="text-sm font-semibold text-white mb-2">Auto-Start Active:</h4>
           <ol className="text-xs text-slate-300 space-y-1 text-left">
-            <li>1. Click "Start AI Agent" to activate voice recognition</li>
-            <li>2. Say "hello", "hi", or "hey" to start a conversation</li>
-            <li>3. The AI will respond with both text and voice</li>
-            <li>4. Click "Stop AI Agent" to deactivate the assistant</li>
+            <li>• AI Agent starts automatically when backend connects</li>
+            <li>• Say "hello", "hi", or "hey" to interact</li>
+            <li>• Voice recognition and response enabled</li>
+            <li>• Stops automatically when server disconnects</li>
           </ol>
         </div>
 
@@ -328,7 +382,16 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
           <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
             <div className="flex items-center justify-center gap-2 text-yellow-400">
               <Bot className="w-4 h-4" />
-              <span className="text-sm font-medium">AI Agent available offline</span>
+              <span className="text-sm font-medium">Waiting for backend connection...</span>
+            </div>
+          </div>
+        )}
+
+        {serverConnected && isActive && (
+          <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <div className="flex items-center justify-center gap-2 text-green-400">
+              <Bot className="w-4 h-4" />
+              <span className="text-sm font-medium">AI Agent Active & Ready</span>
             </div>
           </div>
         )}
