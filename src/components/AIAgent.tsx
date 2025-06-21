@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX, Settings, Key, TestTube } from 'lucide-react';
+import { Bot, BotOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AIAgentProps {
@@ -12,12 +12,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [chatGptApiKey, setChatGptApiKey] = useState('');
-  const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('Aria');
-  const [demoMode, setDemoMode] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('');
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -38,29 +32,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     }
   };
 
-  // Function to mask API keys for display
-  const maskApiKey = (key: string): string => {
-    if (!key) return '';
-    if (key.length <= 8) return '*'.repeat(key.length);
-    return key.substring(0, 4) + '*'.repeat(key.length - 8) + key.substring(key.length - 4);
-  };
-
-  // Load API keys from localStorage or use encoded defaults
-  useEffect(() => {
-    const savedChatGptKey = localStorage.getItem('chatgpt_api_key');
-    const savedElevenLabsKey = localStorage.getItem('elevenlabs_api_key');
-    const savedVoice = localStorage.getItem('ai_agent_voice');
-    const savedDemoMode = localStorage.getItem('demo_mode') === 'true';
-    const savedAdminEmail = localStorage.getItem('admin_email');
-    
-    // Use saved keys if available, otherwise use encoded defaults
-    setChatGptApiKey(savedChatGptKey || decodeKey(encodedKeys.chatgpt));
-    setElevenLabsApiKey(savedElevenLabsKey || decodeKey(encodedKeys.elevenlabs));
-    if (savedVoice) setSelectedVoice(savedVoice);
-    setDemoMode(savedDemoMode);
-    if (savedAdminEmail) setAdminEmail(savedAdminEmail);
-  }, []);
-
   // Voice IDs for ElevenLabs
   const voices = {
     'Aria': '9BWtsMINqrJLrRacOk9x',
@@ -73,6 +44,8 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     'Charlotte': 'XB0fDUnXU5powFXDhCwa',
     'Alice': 'Xb7hH8MSUJpSbSDYk0k2'
   };
+
+  const selectedVoice = 'Aria'; // Default voice
 
   // Initialize speech recognition
   useEffect(() => {
@@ -122,33 +95,16 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     };
   }, [isActive]);
 
-  const saveApiKeys = () => {
-    localStorage.setItem('chatgpt_api_key', chatGptApiKey);
-    localStorage.setItem('elevenlabs_api_key', elevenLabsApiKey);
-    localStorage.setItem('ai_agent_voice', selectedVoice);
-    localStorage.setItem('demo_mode', demoMode.toString());
-    localStorage.setItem('admin_email', adminEmail);
-    
-    toast({
-      title: "Settings Saved",
-      description: "API keys, voice settings, and demo configuration have been saved locally.",
-    });
-    
-    setShowSettings(false);
-  };
-
   const startAgent = async () => {
-    // Auto-use encoded keys if no custom keys are set
-    const effectiveChatGptKey = chatGptApiKey || decodeKey(encodedKeys.chatgpt);
-    const effectiveElevenLabsKey = elevenLabsApiKey || decodeKey(encodedKeys.elevenlabs);
+    const effectiveChatGptKey = decodeKey(encodedKeys.chatgpt);
+    const effectiveElevenLabsKey = decodeKey(encodedKeys.elevenlabs);
 
     if (!effectiveChatGptKey || !effectiveElevenLabsKey) {
       toast({
-        title: "API Keys Required",
-        description: "Please configure ChatGPT and ElevenLabs API keys first.",
+        title: "API Keys Error",
+        description: "API keys are not properly configured.",
         variant: "destructive"
       });
-      setShowSettings(true);
       return;
     }
 
@@ -165,7 +121,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
       
       toast({
         title: "🤖 AI Agent Activated",
-        description: demoMode ? "Demo mode active - USB notifications will be sent to admin email!" : "Say 'hello', 'hi', or 'hey' to start a conversation!",
+        description: "Say 'hello', 'hi', or 'hey' to start a conversation!",
       });
     } catch (error) {
       toast({
@@ -210,7 +166,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
       console.error('Error handling greeting:', error);
       toast({
         title: "AI Agent Error",
-        description: "Failed to process your greeting. Please check your API keys.",
+        description: "Failed to process your greeting.",
         variant: "destructive"
       });
     }
@@ -218,7 +174,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
 
   const getChatGPTResponse = async (message: string): Promise<string | null> => {
     try {
-      const effectiveApiKey = chatGptApiKey || decodeKey(encodedKeys.chatgpt);
+      const effectiveApiKey = decodeKey(encodedKeys.chatgpt);
       
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -259,7 +215,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
     try {
       setIsSpeaking(true);
       
-      const effectiveApiKey = elevenLabsApiKey || decodeKey(encodedKeys.elevenlabs);
+      const effectiveApiKey = decodeKey(encodedKeys.elevenlabs);
       const voiceId = voices[selectedVoice as keyof typeof voices];
       
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -304,7 +260,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
       
       toast({
         title: "Voice Synthesis Error",
-        description: "Failed to generate voice response. Check your ElevenLabs API key.",
+        description: "Failed to generate voice response.",
         variant: "destructive"
       });
     }
@@ -320,16 +276,9 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
             )}
           </div>
-          {demoMode && (
-            <div className="ml-2">
-              <TestTube className="w-6 h-6 text-orange-400" />
-            </div>
-          )}
         </div>
         
-        <h3 className="text-xl font-bold text-white mb-6">
-          AI Security Assistant {demoMode && <span className="text-orange-400">(Demo)</span>}
-        </h3>
+        <h3 className="text-xl font-bold text-white mb-6">AI Security Assistant</h3>
 
         {/* Status Indicators */}
         <div className="flex justify-center gap-4 mb-6">
@@ -348,12 +297,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
           </div>
         </div>
 
-        {/* Control Buttons */}
-        <div className="flex gap-3 mb-6">
+        {/* Control Button */}
+        <div className="mb-6">
           <button
             onClick={isActive ? stopAgent : startAgent}
             disabled={!serverConnected}
-            className={`flex-1 ${
+            className={`w-full ${
               isActive 
                 ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600' 
                 : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
@@ -362,125 +311,16 @@ const AIAgent: React.FC<AIAgentProps> = ({ serverConnected }) => {
             {isActive ? <BotOff className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
             {isActive ? 'Stop AI Agent' : 'Start AI Agent'}
           </button>
-
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 shadow-lg flex items-center justify-center"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
         </div>
-
-        {/* Settings Panel */}
-        {showSettings && (
-          <div className="bg-gray-800/50 border border-gray-600/30 rounded-xl p-4 mb-4">
-            <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              Configuration
-            </h4>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  ChatGPT API Key
-                </label>
-                <input
-                  type="password"
-                  value={maskApiKey(chatGptApiKey)}
-                  onChange={(e) => setChatGptApiKey(e.target.value)}
-                  placeholder="Enter your ChatGPT API key"
-                  className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">Your API key is masked for security</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  ElevenLabs API Key
-                </label>
-                <input
-                  type="password"
-                  value={maskApiKey(elevenLabsApiKey)}
-                  onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                  placeholder="Enter your ElevenLabs API key"
-                  className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">Your API key is masked for security</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Voice Selection
-                </label>
-                <select
-                  value={selectedVoice}
-                  onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {Object.keys(voices).map((voice) => (
-                    <option key={voice} value={voice}>{voice}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Demo Mode Section */}
-              <div className="border-t border-gray-600/30 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                    <TestTube className="w-4 h-4" />
-                    Demo Mode
-                  </label>
-                  <button
-                    onClick={() => setDemoMode(!demoMode)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      demoMode ? 'bg-orange-500' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      demoMode ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mb-3">
-                  Enable demo mode to simulate USB insertion notifications
-                </p>
-                
-                {demoMode && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Admin Email for Notifications
-                    </label>
-                    <input
-                      type="email"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-                )}
-              </div>
-              
-              <button
-                onClick={saveApiKeys}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white py-3 px-6 rounded-xl font-medium transition-all duration-300 shadow-lg"
-              >
-                Save Settings
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Instructions */}
         <div className="bg-white/5 rounded-xl border border-white/10 p-4">
           <h4 className="text-sm font-semibold text-white mb-2">How to use:</h4>
           <ol className="text-xs text-slate-300 space-y-1 text-left">
-            <li>1. Configure your ChatGPT and ElevenLabs API keys in settings</li>
-            <li>2. Enable demo mode for USB insertion simulations (optional)</li>
-            <li>3. Click "Start AI Agent" to activate voice recognition</li>
-            <li>4. Say "hello", "hi", or "hey" to start a conversation</li>
-            <li>5. The AI will respond with both text and voice</li>
-            <li>6. Click "Stop AI Agent" to deactivate the assistant</li>
+            <li>1. Click "Start AI Agent" to activate voice recognition</li>
+            <li>2. Say "hello", "hi", or "hey" to start a conversation</li>
+            <li>3. The AI will respond with both text and voice</li>
+            <li>4. Click "Stop AI Agent" to deactivate the assistant</li>
           </ol>
         </div>
 
